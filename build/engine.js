@@ -71,6 +71,7 @@ const LAYERS=[
  {id:"flora",label:"Woods / Line-of-Sight",sw:"#2f5a2f"},
  {id:"keyterrain",label:"Key Terrain (KOCOA)",sw:"#c9a14a"},
  {id:"oplines",label:"Operational Graphics (Lines & Avenues)",sw:"#1f4e79"},
+ {id:"hexgrid",label:"Hex Grid (~300 m · movement)",sw:"#e7d9ad"},
  {id:"units",label:"Units & Movement",sw:"#2f6fb0"},
  {id:"labels",label:"Map Labels",sw:"#d8cfae"},
  {id:"photos",label:"Photo Markers",sw:"#c9a14a"},
@@ -87,7 +88,7 @@ function rebuildMapSkeleton(kind){
   clear(svg); G={};
   svg.setAttribute("viewBox", kind==="field" ? `0 0 ${GB.fieldBase.w} ${GB.fieldBase.h}` : "0 0 1000 800");
   const root=S("g",{id:"vp"}); svg.appendChild(root); G.root=root;
-  ["base","hsover","floraover","relief","woods","water","roads","town","koca","iconic","oplines","labels","arrows","units","hotspots","stands"]
+  ["base","hsover","floraover","relief","woods","water","roads","town","koca","hexgrid","iconic","oplines","labels","arrows","units","hotspots","stands"]
     .forEach(n=>{const g=S("g",{class:"layer-"+n});root.appendChild(g);G[n]=g;});
   if(kind==="field") drawFieldBase(); else drawCampaign();
   applyView();
@@ -127,6 +128,7 @@ function drawFieldBase(){
     t.textContent=l.t;G.labels.appendChild(t);
   });
   drawOpLines();
+  drawHexGrid();
 }
 
 /* =====================================================================
@@ -257,6 +259,33 @@ function setOpLineFocus(standId,mode){
     else { g.style.display="none"; }
   });
 }
+
+// =====================================================================
+//  HEX GRID — ~300 m flat-top hexes on axial (q,r) coords. The discrete
+//  substrate: one unit per hex (no stacking by construction), hex-to-hex
+//  movement, and the basis for the later war game. Phase 1 = the grid.
+// =====================================================================
+// Hexes are built in the rendered PIXEL space (the map's own coordinates) with a y-stretch (yk) that compensates
+// for the map's non-uniform x/y scale, so each hex covers roughly equal GROUND (~300 m) and renders as a clean hex.
+const HEX={ R:32, yk:1.57, ox:96, oy:236, qMin:-3, qMax:25, rMin:-14, rMax:30 }; // R in fieldBase px
+function hexCenter(q,r){ return [ HEX.ox + 1.5*HEX.R*q, HEX.oy + Math.sqrt(3)*HEX.R*HEX.yk*(r + q/2) ]; } // axial → pixel
+function hexRound(qf,rf){ let x=qf, z=rf, y=-x-z, rx=Math.round(x), ry=Math.round(y), rz=Math.round(z);
+  const dx=Math.abs(rx-x), dy=Math.abs(ry-y), dz=Math.abs(rz-z);
+  if(dx>dy&&dx>dz) rx=-ry-rz; else if(dy>dz) ry=-rx-rz; else rz=-rx-ry; return [rx,rz]; }
+function pixelToHex(px,py){ const q=(px-HEX.ox)/(1.5*HEX.R), r=(py-HEX.oy)/(Math.sqrt(3)*HEX.R*HEX.yk)-q/2; return hexRound(q,r); }
+function schematicToHex(x,y){ const p=TC(x,y); return pixelToHex(p[0],p[1]); }   // unit (schematic) → hex
+function hexCenterPx(q,r){ return hexCenter(q,r); }                              // already pixel
+function hexPolyPx(q,r){ const c=hexCenter(q,r), pts=[];
+  for(let i=0;i<6;i++){ const a=Math.PI/3*i; pts.push([c[0]+HEX.R*Math.cos(a), c[1]+HEX.R*HEX.yk*Math.sin(a)]); } return pts; }
+function eachHex(fn){ for(let q=HEX.qMin;q<=HEX.qMax;q++)for(let r=HEX.rMin;r<=HEX.rMax;r++){
+  const c=hexCenter(q,r); if(c[0]<40||c[0]>1180||c[1]<200||c[1]>2470)continue; fn(q,r,c); } } // clip to the battlefield
+function drawHexGrid(){
+  if(!G.hexgrid)return; clear(G.hexgrid);
+  eachHex((q,r)=>{ const pts=hexPolyPx(q,r), d=pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ")+"Z";
+    G.hexgrid.appendChild(S("path",{d,fill:"none",stroke:"#0d1117","stroke-width":5,opacity:.42}));   // dark casing for contrast
+    G.hexgrid.appendChild(S("path",{d,fill:"none",stroke:"#ffe7a0","stroke-width":2.4,opacity:.6})); });
+}
+window.HEX=HEX; window.schematicToHex=schematicToHex; window.hexCenter=hexCenter; window.hexCenterPx=hexCenterPx;
 
 function drawField(){
   const T=GB.terrain;
@@ -622,11 +651,13 @@ function applyLayers(){
     G.floraover.style.display=L.has("flora")?"":"none";
     G.koca.style.display=L.has("keyterrain")?"":"none";
     if(G.oplines)G.oplines.style.display=L.has("oplines")?"":"none";
+    if(G.hexgrid)G.hexgrid.style.display=L.has("hexgrid")?"":"none";
     G.iconic.style.display="";
     G.labels.style.display=L.has("labels")?"":"none";
   }else{
     G.base.style.display="none";G.koca.style.display="none";G.iconic.style.display="none";
     if(G.oplines)G.oplines.style.display="none";
+    if(G.hexgrid)G.hexgrid.style.display="none";
     G.hsover.style.display="none";G.floraover.style.display="none";
     [G.relief,G.water,G.town].forEach(g=>g.style.display="");
     [G.woods,G.roads].forEach(g=>g.style.display="none");
