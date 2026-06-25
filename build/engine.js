@@ -267,7 +267,7 @@ function setOpLineFocus(standId,mode){
 // =====================================================================
 // Hexes are built in the rendered PIXEL space (the map's own coordinates) with a y-stretch (yk) that compensates
 // for the map's non-uniform x/y scale, so each hex covers roughly equal GROUND (~300 m) and renders as a clean hex.
-const HEX={ R:34, yk:1.0, ox:96, oy:236, qMin:-3, qMax:25, rMin:-16, rMax:40 }; // R in fieldBase px; yk=1 → true regular hexagons
+const HEX={ R:46, yk:1.0, ox:96, oy:236, qMin:-3, qMax:18, rMin:-14, rMax:32 }; // R sized so a unit counter (~68px) nests inside with margin → counters never overlap between adjacent hexes
 function hexCenter(q,r){ return [ HEX.ox + 1.5*HEX.R*q, HEX.oy + Math.sqrt(3)*HEX.R*HEX.yk*(r + q/2) ]; } // axial → pixel
 function hexRound(qf,rf){ let x=qf, z=rf, y=-x-z, rx=Math.round(x), ry=Math.round(y), rz=Math.round(z);
   const dx=Math.abs(rx-x), dy=Math.abs(ry-y), dz=Math.abs(rz-z);
