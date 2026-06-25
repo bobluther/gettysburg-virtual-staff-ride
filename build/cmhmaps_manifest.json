@@ -1,0 +1,50 @@
+[
+  {
+    "key": "cmh_map1",
+    "title": "Campaign Movements to Gettysburg",
+    "caption": "Movements of Union and Confederate forces from the Rappahannock River through Pennsylvania, 3–30 June 1863, showing corps routes, cavalry screens, and the convergence on Gettysburg.",
+    "license": "U.S. Army Center of Military History (public domain)"
+  },
+  {
+    "key": "cmh_map2",
+    "title": "Meade's Pipe Creek Defensive Position",
+    "caption": "Union corps positions as of 30 June 1863 and Meade's planned defensive line along Big Pipe Creek between Manchester and Middleburg, Maryland.",
+    "license": "U.S. Army Center of Military History (public domain)"
+  },
+  {
+    "key": "cmh_map3",
+    "title": "Battle of Gettysburg — 1 July 1863",
+    "caption": "Tactical map of the first day's fighting northwest and north of Gettysburg, showing Union I and XI Corps positions and the Confederate attacks by Hill and Ewell that drove the Federals through town to Cemetery Hill.",
+    "license": "U.S. Army Center of Military History (public domain)"
+  },
+  {
+    "key": "cmh_map4",
+    "title": "Battle of Gettysburg — 2 July 1863",
+    "caption": "Tactical map of the second day's fighting, showing Longstreet's assault on the Union left from Devil's Den through the Wheatfield and Peach Orchard to Little Round Top, and Ewell's diversionary attacks on the right.",
+    "license": "U.S. Army Center of Military History (public domain)"
+  },
+  {
+    "key": "cmh_map5",
+    "title": "Battle of Gettysburg — 3 July 1863",
+    "caption": "Tactical map of the third day's fighting, including Pickett's Charge across the open fields toward Cemetery Ridge and the Confederate and Union positions at the climax of the battle.",
+    "license": "U.S. Army Center of Military History (public domain)"
+  },
+  {
+    "key": "cmh_us1861",
+    "title": "United States in 1861",
+    "caption": "National overview map showing Union states, Confederate states, border states, and western territories at the outbreak of the Civil War.",
+    "license": "U.S. Army Center of Military History (public domain)"
+  },
+  {
+    "key": "cmh_lrt1",
+    "title": "Little Round Top — Initial Positions, ~4 p.m., 2 July 1863",
+    "caption": "Overview map of Union and Confederate positions south of Gettysburg around 4 p.m. on 2 July 1863, showing Sickles' exposed III Corps salient and the approach routes to Little Round Top.",
+    "license": "U.S. Army Center of Military History (public domain)"
+  },
+  {
+    "key": "cmh_lrt2",
+    "title": "The 20th Maine on Little Round Top",
+    "caption": "Tactical diagram of the 20th Maine Infantry's defense of Little Round Top, showing regiment positions, the attacking Alabama regiments, and Captain Morrill's flanking company at the stone wall below Big Round Top.",
+    "license": "U.S. Army Center of Military History (public domain)"
+  }
+]

@@ -1,0 +1,17 @@
+{
+  "name": "Gettysburg Staff Ride Companion",
+  "short_name": "Gettysburg",
+  "description": "Gettysburg staff-ride companion — GPS-guided tours, command decisions, operational graphics, and stand-to-stand directions on the ground.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0e1218",
+  "theme_color": "#10141a",
+  "categories": ["education", "reference"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

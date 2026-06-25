@@ -1,0 +1,14 @@
+# OS / editor junk
+.DS_Store
+*.swp
+Thumbs.db
+# Node
+node_modules/
+# Intermediate asset downloads (not source of record)
+assets-src/*.download
+# Old byothermeansX deployment mirror (superseded by /docs on this account)
+pwa/
+# Scratch / local
+.remember/
+scratchpad/
+*.log
