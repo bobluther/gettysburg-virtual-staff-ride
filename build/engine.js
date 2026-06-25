@@ -287,6 +287,26 @@ function drawHexGrid(){
 }
 window.HEX=HEX; window.schematicToHex=schematicToHex; window.hexCenter=hexCenter; window.hexCenterPx=hexCenterPx;
 
+// --- Hex occupancy: snap every counter onto a UNIQUE hex (one per hex) → no overlap, no unit shoved into the
+//     enemy by a declutter heuristic; each unit sits on the hex its position falls in, or the nearest free one. ---
+const HEXDIRS=[[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
+function hexRing(c,radius){ const out=[]; let q=c[0]+HEXDIRS[4][0]*radius, r=c[1]+HEXDIRS[4][1]*radius;
+  for(let i=0;i<6;i++)for(let j=0;j<radius;j++){ out.push([q,r]); q+=HEXDIRS[i][0]; r+=HEXDIRS[i][1]; } return out; }
+function nearestFreeHex(h,occ){ if(!occ.has(h[0]+","+h[1]))return h;
+  for(let rad=1;rad<10;rad++){ for(const c of hexRing(h,rad)) if(!occ.has(c[0]+","+c[1]))return c; } return h; }
+function snapAllToHexes(){
+  if(!G.units)return;
+  const named=[...G.units.querySelectorAll(".unit")].filter(g=>g.style.display!=="none");
+  const toks=G.arrows?[...G.arrows.querySelectorAll(".unit")].filter(g=>g.style.display!=="none"):[];
+  // claim hexes in order of how STILL a counter is: stationary defenders take their hex first; movers/tokens take the nearest free one
+  const all=named.concat(toks).map(g=>{ const p=curXY(g), ox=+g.getAttribute("data-ox"), oy=+g.getAttribute("data-oy"), isTok=!g.getAttribute("data-name");
+    return {g,p,sc:+(g.getAttribute("data-sc")||2), disp:isTok?9e9:(isNaN(ox)?0:Math.hypot(p[0]-ox,p[1]-oy))}; });
+  all.sort((a,b)=>a.disp-b.disp);
+  const occ=new Set();
+  all.forEach(o=>{ const fh=nearestFreeHex(pixelToHex(o.p[0],o.p[1]),occ); occ.add(fh[0]+","+fh[1]);
+    const c=hexCenterPx(fh[0],fh[1]); setUnitPos(o.g,Math.round(c[0]),Math.round(c[1]),o.sc); });
+}
+
 function drawField(){
   const T=GB.terrain;
   // elevation relief: ridges as soft strokes, hills as radial gradients
@@ -1894,7 +1914,7 @@ function animateMove(i,instant){
   const cap=$("#moveCaption"); if(cap){cap.textContent=a.narr||a.lbl||curStep().title; cap.classList.remove("hidden"); cap.style.opacity="";}
   // Prefer moving the ACTUAL on-map unit (it persists at its new spot — no ghost, no vanishing).
   const unitG=findUnitByName(unitMoveName(a)), sc=unitG?(unitG.getAttribute("data-sc")||2):1.55;
-  if(unitG){ const off=offsetFor(unitG.getAttribute("data-name")); to=[to[0]+off[0],to[1]+off[1]]; } // travel to the unit's FIXED decluttered spot
+  // (units snap to their hex on arrival — animate to the raw arrow destination)
   let mover=unitG, from;
   if(unitG){ from=curXY(unitG); }
   else { // fallback: a transient token for movements that aren't one of the placed units
@@ -1915,7 +1935,7 @@ function animateMove(i,instant){
     (function frame(now){ const t=Math.min(1,(now-t0)/dur),e=EASE_INOUT(t);
       setT(from[0]+(to[0]-from[0])*e, from[1]+(to[1]-from[1])*e);
       nudgeMover(mover); // veer around any unit on the path — never slide over one
-      if(t<1)_beatRAF=requestAnimationFrame(frame); else { if(unitG&&a.fate)applyFate(unitG,a.fate); declutterAll(); maybeAutoAdvance(); }
+      if(t<1)_beatRAF=requestAnimationFrame(frame); else { if(unitG&&a.fate)applyFate(unitG,a.fate); snapAllToHexes(); maybeAutoAdvance(); }
     })(t0);
   };
   _moveHold=setTimeout(runMove,readHold);
@@ -1940,7 +1960,7 @@ function showUpTo(target){ // rebuild the scene through beat `target` (earlier i
       if(_auto){ if(target<beats.length-1){ clearTimeout(_beatTimer); _beatTimer=setTimeout(()=>{ if(_auto)nextBeat(); },capDwell(bt)); } else { _auto=false; setPlayBtn(); updateStepBar(); } } }
     else if(bt.type==='choice' && k===target){ if(cap)cap.classList.add("hidden"); showChoice(bt.key); }  // pauses for your call — map stays visible
   }
-  state._movedNames=movedNames; applyStaticOffsets(movedNames); declutterAll(); // movers/tokens yield to settled defenders → no stack, no jitter
+  state._movedNames=movedNames; snapAllToHexes(); // one counter per hex — discrete positions replace the declutter heuristics
 }
 function clearBeats(){ cancelAnimationFrame(_beatRAF); clearTimeout(_beatTimer); clearTimeout(_moveHold); _auto=false; _beatTok.forEach(t=>t&&t.remove()); _beatTok=[]; const cap=$("#moveCaption"); if(cap){cap.classList.add("hidden");cap.style.opacity="";} closeDecisionCard(); closeChoice(); setPlayBtn(); }
 function startBeats(autoplay){ clearBeats(); state._beats=buildBeats(); state.beat=-1; _auto=!!autoplay; updateStepBar(); setPlayBtn();
