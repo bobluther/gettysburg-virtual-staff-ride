@@ -71,6 +71,7 @@ const LAYERS=[
  {id:"flora",label:"Woods / Line-of-Sight",sw:"#2f5a2f"},
  {id:"keyterrain",label:"Key Terrain (KOCOA)",sw:"#c9a14a"},
  {id:"oplines",label:"Operational Graphics (Lines & Avenues)",sw:"#1f4e79"},
+ {id:"hexterr",label:"Hex Terrain (lidar — elevation & cover)",sw:"#3a6b3a"},
  {id:"hexgrid",label:"Hex Grid (~300 m · movement)",sw:"#e7d9ad"},
  {id:"units",label:"Units & Movement",sw:"#2f6fb0"},
  {id:"labels",label:"Map Labels",sw:"#d8cfae"},
@@ -88,7 +89,7 @@ function rebuildMapSkeleton(kind){
   clear(svg); G={};
   svg.setAttribute("viewBox", kind==="field" ? `0 0 ${GB.fieldBase.w} ${GB.fieldBase.h}` : "0 0 1000 800");
   const root=S("g",{id:"vp"}); svg.appendChild(root); G.root=root;
-  ["base","hsover","floraover","relief","woods","water","roads","town","koca","hexgrid","iconic","oplines","labels","arrows","units","hotspots","stands"]
+  ["base","hsover","floraover","relief","woods","water","roads","town","koca","hexterr","hexgrid","iconic","oplines","labels","arrows","units","hotspots","stands"]
     .forEach(n=>{const g=S("g",{class:"layer-"+n});root.appendChild(g);G[n]=g;});
   if(kind==="field") drawFieldBase(); else drawCampaign();
   applyView();
@@ -128,7 +129,7 @@ function drawFieldBase(){
     t.textContent=l.t;G.labels.appendChild(t);
   });
   drawOpLines();
-  drawHexGrid();
+  drawHexTerrain(); drawHexGrid();
 }
 
 /* =====================================================================
@@ -280,12 +281,42 @@ function hexPolyPx(q,r){ const c=hexCenter(q,r), pts=[];
 function eachHex(fn){ for(let q=HEX.qMin;q<=HEX.qMax;q++)for(let r=HEX.rMin;r<=HEX.rMax;r++){
   const c=hexCenter(q,r); if(c[0]<40||c[0]>1180||c[1]<200||c[1]>2470)continue; fn(q,r,c); } } // clip to the battlefield
 function drawHexGrid(){
-  if(!G.hexgrid)return; clear(G.hexgrid);
+  if(!G.hexgrid||G.hexgrid.childNodes.length)return;
   eachHex((q,r)=>{ const pts=hexPolyPx(q,r), d=pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ")+"Z";
     G.hexgrid.appendChild(S("path",{d,fill:"none",stroke:"#0d1117","stroke-width":5,opacity:.42}));   // dark casing for contrast
     G.hexgrid.appendChild(S("path",{d,fill:"none",stroke:"#ffe7a0","stroke-width":2.4,opacity:.6})); });
 }
 window.HEX=HEX; window.schematicToHex=schematicToHex; window.hexCenter=hexCenter; window.hexCenterPx=hexCenterPx;
+
+// --- TERRAIN PER HEX (Phase 2b): each hex tagged with elevation (lidar DEM) + dominant type (open/woods/town/
+//     water), sampled at its center. This is the substrate for movement cost, cover, and line-of-sight. ---
+function pixelToSchem(px,py){ if(!AFF)fitAffine(); const det=(AFF.a*AFF.e-AFF.b*AFF.d)||1, X=px-AFF.c, Y=py-AFF.f;
+  return [ (AFF.e*X-AFF.b*Y)/det, (-AFF.d*X+AFF.a*Y)/det ]; }
+function pointInPoly(p,pts){ let inside=false; for(let i=0,j=pts.length-1;i<pts.length;j=i++){
+  const xi=pts[i][0],yi=pts[i][1],xj=pts[j][0],yj=pts[j][1];
+  if(((yi>p[1])!==(yj>p[1])) && (p[0]<(xj-xi)*(p[1]-yi)/((yj-yi)||1e-9)+xi)) inside=!inside; } return inside; }
+function distToSeg(p,a,b){ const dx=b[0]-a[0],dy=b[1]-a[1],l2=dx*dx+dy*dy; let t=l2?((p[0]-a[0])*dx+(p[1]-a[1])*dy)/l2:0;
+  t=t<0?0:t>1?1:t; return Math.hypot(p[0]-(a[0]+t*dx), p[1]-(a[1]+t*dy)); }
+function classifyTerrain(sc){ const Tt=GB.terrain||{};
+  if(Tt.town&&Tt.town.pts&&pointInPoly(sc,Tt.town.pts))return "town";
+  for(const w of (Tt.woods||[])) if(w.pts&&pointInPoly(sc,w.pts))return "woods";
+  for(const w of (Tt.water||[])){ const p=w.pts||[]; for(let i=1;i<p.length;i++) if(distToSeg(sc,p[i-1],p[i])<7)return "water"; }
+  return "open"; }
+const HEXTERR=new Map();
+function computeHexTerrain(){ HEXTERR.clear();
+  eachHex((q,r,cPix)=>{ const c=hexCenterPx(q,r), sc=pixelToSchem(c[0],c[1]), ll=old2ll(sc[0],sc[1]);
+    HEXTERR.set(q+","+r, { type:classifyTerrain(sc), elev:Math.round(demElev(ll[0],ll[1])) }); }); }
+function hexTerrainAt(q,r){ if(!HEXTERR.size)computeHexTerrain(); return HEXTERR.get(q+","+r)||{type:"open",elev:150}; }
+const TERR_FILL={ woods:"#26401c", town:"#5b4a36", water:"#2f6f8c", open:null };
+function drawHexTerrain(){ if(!G.hexterr||G.hexterr.childNodes.length)return; if(!HEXTERR.size)computeHexTerrain();
+  const lo=110, hi=180; // battlefield-relevant elevation band for the high-ground shading
+  eachHex((q,r)=>{ const t=hexTerrainAt(q,r), pts=hexPolyPx(q,r), d=pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ")+"Z";
+    const f=TERR_FILL[t.type];
+    if(f){ G.hexterr.appendChild(S("path",{d,fill:f,opacity:t.type==="water"?.58:.52,stroke:"none"})); }
+    else { // open ground: warm tint scaled to elevation so the high ground reads at a glance
+      const e=Math.max(0,Math.min(1,(t.elev-lo)/(hi-lo)));
+      if(e>0.04) G.hexterr.appendChild(S("path",{d,fill:"#d2a544",opacity:(0.06+e*0.44).toFixed(2),stroke:"none"})); }
+  }); }
 
 // --- Hex occupancy: snap every counter onto a UNIQUE hex (one per hex) → no overlap, no unit shoved into the
 //     enemy by a declutter heuristic; each unit sits on the hex its position falls in, or the nearest free one. ---
@@ -691,6 +722,7 @@ function applyLayers(){
     G.floraover.style.display=L.has("flora")?"":"none";
     G.koca.style.display=L.has("keyterrain")?"":"none";
     if(G.oplines)G.oplines.style.display=L.has("oplines")?"":"none";
+    if(G.hexterr)G.hexterr.style.display=L.has("hexterr")?"":"none";
     if(G.hexgrid)G.hexgrid.style.display=L.has("hexgrid")?"":"none";
     G.iconic.style.display="";
     G.labels.style.display=L.has("labels")?"":"none";
@@ -698,6 +730,7 @@ function applyLayers(){
     G.base.style.display="none";G.koca.style.display="none";G.iconic.style.display="none";
     if(G.oplines)G.oplines.style.display="none";
     if(G.hexgrid)G.hexgrid.style.display="none";
+    if(G.hexterr)G.hexterr.style.display="none";
     G.hsover.style.display="none";G.floraover.style.display="none";
     [G.relief,G.water,G.town].forEach(g=>g.style.display="");
     [G.woods,G.roads].forEach(g=>g.style.display="none");
