@@ -294,6 +294,18 @@ function hexRing(c,radius){ const out=[]; let q=c[0]+HEXDIRS[4][0]*radius, r=c[1
   for(let i=0;i<6;i++)for(let j=0;j<radius;j++){ out.push([q,r]); q+=HEXDIRS[i][0]; r+=HEXDIRS[i][1]; } return out; }
 function nearestFreeHex(h,occ){ if(!occ.has(h[0]+","+h[1]))return h;
   for(let rad=1;rad<10;rad++){ for(const c of hexRing(h,rad)) if(!occ.has(c[0]+","+c[1]))return c; } return h; }
+function hexDist(a,b){ return (Math.abs(a[0]-b[0])+Math.abs(a[0]+a[1]-b[0]-b[1])+Math.abs(a[1]-b[1]))/2; }
+function hexNeighbors(h){ return HEXDIRS.map(d=>[h[0]+d[0],h[1]+d[1]]); }
+// Greedy best-first path start→goal over the hex grid, routing AROUND blocked (occupied) hexes — so a maneuvering
+// counter never slides through a hex another unit holds (kills the "Gamble over Archer" path-crossing for good).
+function hexPath(start,goal,blocked){ const key=h=>h[0]+","+h[1];
+  if(key(start)===key(goal))return [start];
+  let frontier=[start]; const came={}; came[key(start)]=null; const seen=new Set([key(start)]); let found=false;
+  for(let it=0; it<1500 && frontier.length; it++){ frontier.sort((a,b)=>hexDist(a,goal)-hexDist(b,goal)); const cur=frontier.shift();
+    if(key(cur)===key(goal)){found=true;break;}
+    for(const nb of hexNeighbors(cur)){ const k=key(nb); if(seen.has(k))continue; if(blocked.has(k)&&k!==key(goal))continue; seen.add(k); came[k]=cur; frontier.push(nb); } }
+  if(!found)return [start,goal];
+  const path=[]; let c=goal; while(c){ path.unshift(c); c=came[key(c)]; } return path; }
 function snapAllToHexes(){
   if(!G.units)return;
   const named=[...G.units.querySelectorAll(".unit")].filter(g=>g.style.display!=="none");
@@ -305,6 +317,14 @@ function snapAllToHexes(){
   const occ=new Set();
   all.forEach(o=>{ const fh=nearestFreeHex(pixelToHex(o.p[0],o.p[1]),occ); occ.add(fh[0]+","+fh[1]);
     const c=hexCenterPx(fh[0],fh[1]); setUnitPos(o.g,Math.round(c[0]),Math.round(c[1]),o.sc); });
+}
+// During a glide, keep the MOVING counter clear of any other counter it passes (the path routes around held hexes;
+// this handles the brief geometric close-pass between adjacent hexes so counters never visibly overlap in motion).
+function clearMover(mover){ if(!mover)return; const p=curXY(mover), sc=+(mover.getAttribute("data-sc")||2); let dx=0,dy=0; const minD=64;
+  const others=[...G.units.querySelectorAll(".unit")]; if(G.arrows)others.push(...G.arrows.querySelectorAll(".unit"));
+  others.forEach(g=>{ if(g===mover||g.style.display==="none")return; const q=curXY(g), ex=p[0]-q[0], ey=p[1]-q[1], d=Math.hypot(ex,ey)||1;
+    if(d<minD){ const k=(minD-d); dx+=ex/d*k; dy+=ey/d*k; } });
+  if(dx||dy)setUnitPos(mover,Math.round(p[0]+dx),Math.round(p[1]+dy),sc);
 }
 
 function drawField(){
@@ -1931,10 +1951,19 @@ function animateMove(i,instant){
   // Decouple reading from motion: hold the caption on a STILL map, let the reader read, THEN the unit moves.
   const words=(a.narr||a.lbl||'').split(/\s+/).filter(Boolean).length;
   const readHold=_auto?Math.min(800,Math.max(280,words*90)):100;
-  const runMove=()=>{ const t0=performance.now(),dur=1400; cancelAnimationFrame(_beatRAF);
-    (function frame(now){ const t=Math.min(1,(now-t0)/dur),e=EASE_INOUT(t);
-      setT(from[0]+(to[0]-from[0])*e, from[1]+(to[1]-from[1])*e);
-      nudgeMover(mover); // veer around any unit on the path — never slide over one
+  const runMove=()=>{ cancelAnimationFrame(_beatRAF);
+    // hex-to-hex: route a PATH from the unit's current hex to its destination hex that goes AROUND every hex held by
+    // another counter, then glide through the path's centers. No straight-line slide over an enemy; lands on the grid.
+    const startP=curXY(mover), startHex=pixelToHex(startP[0],startP[1]), occ=new Set();
+    G.units.querySelectorAll(".unit").forEach(g=>{ if(g!==mover){const p=curXY(g);occ.add(pixelToHex(p[0],p[1]).join(","));} });
+    if(G.arrows)G.arrows.querySelectorAll(".unit").forEach(g=>{ if(g!==mover){const p=curXY(g);occ.add(pixelToHex(p[0],p[1]).join(","));} });
+    const destHex=nearestFreeHex(pixelToHex(to[0],to[1]),occ);
+    const hp=hexPath(startHex,destHex,occ), pts=hp.map(h=>hexCenterPx(h[0],h[1]));
+    if(pts.length<2)pts.unshift(startP);
+    const t0=performance.now(),dur=1400,segs=pts.length-1;
+    (function frame(now){ const t=Math.min(1,(now-t0)/dur),e=EASE_INOUT(t), at=e*segs, i=Math.min(segs-1,Math.floor(at)), f=at-i;
+      const p0=pts[i],p1=pts[i+1]; setT(p0[0]+(p1[0]-p0[0])*f, p0[1]+(p1[1]-p0[1])*f);
+      clearMover(mover); // keep clearance from any counter passed mid-glide
       if(t<1)_beatRAF=requestAnimationFrame(frame); else { if(unitG&&a.fate)applyFate(unitG,a.fate); snapAllToHexes(); maybeAutoAdvance(); }
     })(t0);
   };
