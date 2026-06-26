@@ -29,7 +29,7 @@ Object.assign(GB.battleDetail, {
       {
         side: "union",
         from: [346, 362],
-        to:   [310, 340],
+        to:   [344, 350],
         lbl:  "Gamble — McPherson Ridge",
         narr: "Gamble's brigade fights dismounted along McPherson's Ridge; though badly outnumbered, the troopers' breech-loading carbines give them the firepower of several times their number of infantry."
       },
@@ -49,9 +49,10 @@ Object.assign(GB.battleDetail, {
       },
       {
         side: "union",
-        from: [346, 362],
+        from: [344, 350],
         to:   [400, 370],
         lbl:  "Gamble falls back — Seminary",
+        dashed: true,
         narr: "Buford's line is pushed back to Seminary Ridge as the pressure mounts, his troopers delaying until Wadsworth's infantry can relieve them."
       },
       {
